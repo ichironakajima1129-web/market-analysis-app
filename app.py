@@ -137,7 +137,7 @@ def analyze():
         try:
             with client.messages.stream(
                 model="claude-opus-4-6",
-                max_tokens=4000,
+                max_tokens=8000,
                 system=SYSTEM_PROMPT,
                 messages=[{"role": "user", "content": prompt}],
             ) as stream:
