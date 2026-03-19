@@ -1,0 +1,469 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>市場・競合分析 AI アシスタント</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: 'Hiragino Kaku Gothic ProN', 'Meiryo', sans-serif;
+      background: #f0f4f8;
+      color: #1a202c;
+      min-height: 100vh;
+    }
+
+    header {
+      background: #1a365d;
+      color: white;
+      padding: 20px 40px;
+      display: flex;
+      align-items: center;
+      gap: 16px;
+    }
+
+    header h1 { font-size: 20px; font-weight: 700; }
+    header p { font-size: 13px; opacity: 0.75; margin-top: 4px; }
+
+    .badge {
+      background: #2b6cb0;
+      font-size: 11px;
+      padding: 3px 10px;
+      border-radius: 12px;
+      white-space: nowrap;
+    }
+
+    .container {
+      max-width: 1100px;
+      margin: 0 auto;
+      padding: 32px 24px;
+      display: grid;
+      grid-template-columns: 400px 1fr;
+      gap: 24px;
+      align-items: start;
+    }
+
+    /* ---- Form Panel ---- */
+    .form-panel {
+      background: white;
+      border-radius: 12px;
+      box-shadow: 0 1px 4px rgba(0,0,0,.08);
+      padding: 28px;
+      position: sticky;
+      top: 24px;
+    }
+
+    .form-panel h2 {
+      font-size: 15px;
+      font-weight: 700;
+      margin-bottom: 20px;
+      color: #2d3748;
+      border-left: 4px solid #2b6cb0;
+      padding-left: 10px;
+    }
+
+    .field { margin-bottom: 16px; }
+
+    label {
+      display: block;
+      font-size: 12px;
+      font-weight: 600;
+      color: #4a5568;
+      margin-bottom: 5px;
+    }
+
+    .required { color: #e53e3e; margin-left: 2px; }
+
+    input[type="text"], textarea, select {
+      width: 100%;
+      border: 1px solid #e2e8f0;
+      border-radius: 7px;
+      padding: 9px 12px;
+      font-size: 13px;
+      font-family: inherit;
+      color: #2d3748;
+      transition: border-color .2s;
+      background: #fafafa;
+    }
+
+    input[type="text"]:focus, textarea:focus, select:focus {
+      outline: none;
+      border-color: #2b6cb0;
+      background: white;
+      box-shadow: 0 0 0 3px rgba(43,108,176,.1);
+    }
+
+    textarea { resize: vertical; min-height: 70px; line-height: 1.5; }
+
+    .hint { font-size: 11px; color: #a0aec0; margin-top: 4px; }
+
+    .btn-analyze {
+      width: 100%;
+      background: #2b6cb0;
+      color: white;
+      border: none;
+      border-radius: 8px;
+      padding: 13px;
+      font-size: 15px;
+      font-weight: 700;
+      cursor: pointer;
+      margin-top: 8px;
+      transition: background .2s;
+      font-family: inherit;
+    }
+
+    .btn-analyze:hover:not(:disabled) { background: #2c5282; }
+    .btn-analyze:disabled { background: #a0aec0; cursor: not-allowed; }
+
+    /* ---- Result Panel ---- */
+    .result-panel {
+      background: white;
+      border-radius: 12px;
+      box-shadow: 0 1px 4px rgba(0,0,0,.08);
+      min-height: 500px;
+    }
+
+    .result-header {
+      padding: 20px 28px;
+      border-bottom: 1px solid #e2e8f0;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    .result-header h2 {
+      font-size: 15px;
+      font-weight: 700;
+      color: #2d3748;
+    }
+
+    .status-badge {
+      font-size: 12px;
+      padding: 3px 10px;
+      border-radius: 12px;
+      font-weight: 600;
+    }
+
+    .status-badge.idle { background: #e2e8f0; color: #718096; }
+    .status-badge.analyzing { background: #bee3f8; color: #2b6cb0; }
+    .status-badge.done { background: #c6f6d5; color: #276749; }
+
+    .result-body { padding: 28px; }
+
+    .empty-state {
+      text-align: center;
+      padding: 60px 20px;
+      color: #a0aec0;
+    }
+
+    .empty-state .icon { font-size: 48px; margin-bottom: 16px; }
+    .empty-state p { font-size: 14px; line-height: 1.6; }
+
+    /* ---- Markdown Rendering ---- */
+    #output {
+      font-size: 14px;
+      line-height: 1.75;
+      color: #2d3748;
+    }
+
+    #output h2 {
+      font-size: 16px;
+      font-weight: 700;
+      color: #1a365d;
+      margin: 28px 0 12px;
+      padding-bottom: 8px;
+      border-bottom: 2px solid #ebf4ff;
+    }
+
+    #output h2:first-child { margin-top: 0; }
+
+    #output h3 {
+      font-size: 14px;
+      font-weight: 700;
+      color: #2b6cb0;
+      margin: 16px 0 8px;
+    }
+
+    #output p { margin-bottom: 10px; }
+
+    #output ul, #output ol {
+      padding-left: 20px;
+      margin-bottom: 12px;
+    }
+
+    #output li { margin-bottom: 6px; }
+
+    #output strong { font-weight: 700; color: #1a202c; }
+
+    #output hr {
+      border: none;
+      border-top: 1px solid #e2e8f0;
+      margin: 20px 0;
+    }
+
+    #output blockquote {
+      border-left: 3px solid #2b6cb0;
+      padding-left: 14px;
+      color: #4a5568;
+      margin: 12px 0;
+      font-style: italic;
+    }
+
+    /* ---- Loading animation ---- */
+    .typing-cursor {
+      display: inline-block;
+      width: 2px;
+      height: 16px;
+      background: #2b6cb0;
+      margin-left: 2px;
+      animation: blink .7s infinite;
+      vertical-align: text-bottom;
+    }
+
+    @keyframes blink {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0; }
+    }
+
+    /* ---- Action buttons ---- */
+    .actions {
+      padding: 16px 28px;
+      border-top: 1px solid #e2e8f0;
+      display: flex;
+      gap: 10px;
+    }
+
+    .btn-secondary {
+      border: 1px solid #e2e8f0;
+      background: white;
+      color: #4a5568;
+      border-radius: 7px;
+      padding: 8px 16px;
+      font-size: 13px;
+      cursor: pointer;
+      font-family: inherit;
+      transition: background .15s;
+    }
+
+    .btn-secondary:hover { background: #f7fafc; }
+
+    @media print {
+      header, .form-panel, .actions { display: none; }
+      .container { display: block; }
+      .result-panel { box-shadow: none; }
+    }
+  </style>
+</head>
+<body>
+
+<header>
+  <div>
+    <h1>市場・競合分析 AI アシスタント</h1>
+    <p>商談・提案準備のための仮説立案ツール</p>
+  </div>
+  <div style="display:flex;gap:12px;align-items:center;">
+    <a href="/history" style="color:white;font-size:13px;padding:6px 14px;border:1px solid rgba(255,255,255,.4);border-radius:6px;text-decoration:none;">分析履歴</a>
+    <span class="badge">Powered by Claude Opus</span>
+  </div>
+</header>
+
+<div class="container">
+
+  <!-- 入力フォーム -->
+  <div class="form-panel">
+    <h2>顧客情報の入力</h2>
+
+    <form id="analyzeForm">
+      <div class="field">
+        <label>企業名 <span class="required">*</span></label>
+        <input type="text" name="company_name" placeholder="例：株式会社〇〇" required>
+      </div>
+
+      <div class="field">
+        <label>業種・業界 <span class="required">*</span></label>
+        <input type="text" name="industry" placeholder="例：製造業（自動車部品）、SaaS、小売 など" required>
+      </div>
+
+      <div class="field">
+        <label>企業規模</label>
+        <select name="company_size">
+          <option value="">選択してください</option>
+          <option>スタートアップ（〜50名）</option>
+          <option>中小企業（50〜300名）</option>
+          <option>中堅企業（300〜1000名）</option>
+          <option>大企業（1000名以上）</option>
+          <option>上場企業</option>
+        </select>
+      </div>
+
+      <div class="field">
+        <label>事業内容 <span class="required">*</span></label>
+        <textarea name="business_description" placeholder="主な事業・サービス・製品を簡潔に" required></textarea>
+      </div>
+
+      <div class="field">
+        <label>顧客の課題・悩み <span class="required">*</span></label>
+        <textarea name="challenges" placeholder="ヒアリングで把握している課題や悩み" required></textarea>
+        <p class="hint">断片的な情報でもOK。AIが深掘りします。</p>
+      </div>
+
+      <div class="field">
+        <label>商談の目的</label>
+        <input type="text" name="meeting_purpose" placeholder="例：新規開拓、追加提案、課題ヒアリング など">
+      </div>
+
+      <div class="field">
+        <label>補足情報（任意）</label>
+        <textarea name="additional_info" placeholder="競合他社名、直近の動向、担当者情報など"></textarea>
+      </div>
+
+      <button type="submit" class="btn-analyze" id="analyzeBtn">
+        分析・仮説を生成する
+      </button>
+    </form>
+  </div>
+
+  <!-- 結果パネル -->
+  <div class="result-panel">
+    <div class="result-header">
+      <h2>分析レポート</h2>
+      <span class="status-badge idle" id="statusBadge">待機中</span>
+    </div>
+
+    <div class="result-body">
+      <div class="empty-state" id="emptyState">
+        <div class="icon">📋</div>
+        <p>左のフォームに顧客情報を入力して<br>「分析・仮説を生成する」をクリックしてください。<br><br>市場分析・競合分析・提案仮説を<br>プロのコンサルタント視点でまとめます。</p>
+      </div>
+      <div id="output" style="display:none;"></div>
+    </div>
+
+    <div class="actions" id="actionBar" style="display:none;">
+      <button class="btn-secondary" onclick="window.print()">🖨️ 印刷・PDF保存</button>
+      <button class="btn-secondary" onclick="copyToClipboard()">📋 テキストコピー</button>
+      <button class="btn-secondary" onclick="resetForm()">🔄 リセット</button>
+    </div>
+  </div>
+
+</div>
+
+<!-- marked.js for Markdown rendering -->
+<script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+<script>
+  const form = document.getElementById('analyzeForm');
+  const btn = document.getElementById('analyzeBtn');
+  const output = document.getElementById('output');
+  const emptyState = document.getElementById('emptyState');
+  const statusBadge = document.getElementById('statusBadge');
+  const actionBar = document.getElementById('actionBar');
+
+  let rawText = '';
+  let cursor = null;
+
+  function setStatus(state) {
+    statusBadge.className = 'status-badge ' + state;
+    const labels = { idle: '待機中', analyzing: '分析中...', done: '完了' };
+    statusBadge.textContent = labels[state];
+  }
+
+  function addCursor() {
+    cursor = document.createElement('span');
+    cursor.className = 'typing-cursor';
+    output.appendChild(cursor);
+  }
+
+  function removeCursor() {
+    if (cursor) { cursor.remove(); cursor = null; }
+  }
+
+  function renderMarkdown(text) {
+    return marked.parse(text, { breaks: true, gfm: true });
+  }
+
+  form.addEventListener('submit', async (e) => {
+    e.preventDefault();
+
+    const formData = new FormData(form);
+    const data = Object.fromEntries(formData.entries());
+
+    // UI reset
+    rawText = '';
+    output.innerHTML = '';
+    output.style.display = 'block';
+    emptyState.style.display = 'none';
+    actionBar.style.display = 'none';
+    btn.disabled = true;
+    btn.textContent = '分析中...';
+    setStatus('analyzing');
+    addCursor();
+
+    try {
+      const response = await fetch('/analyze', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(data),
+      });
+
+      const reader = response.body.getReader();
+      const decoder = new TextDecoder();
+      let buffer = '';
+
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+
+        buffer += decoder.decode(value, { stream: true });
+        const lines = buffer.split('\n');
+        buffer = lines.pop();
+
+        for (const line of lines) {
+          if (!line.startsWith('data: ')) continue;
+          const payload = line.slice(6).trim();
+          if (payload === '[DONE]') continue;
+
+          try {
+            const parsed = JSON.parse(payload);
+            if (parsed.error) {
+              output.innerHTML += `<p style="color:#e53e3e;">APIエラー: ${parsed.error}</p>`;
+            } else if (parsed.text) {
+              rawText += parsed.text;
+              removeCursor();
+              output.innerHTML = renderMarkdown(rawText);
+              addCursor();
+              output.scrollIntoView({ behavior: 'smooth', block: 'end' });
+            }
+          } catch (parseErr) {
+            console.error('Parse error:', parseErr, 'payload:', payload);
+          }
+        }
+      }
+    } catch (err) {
+      output.innerHTML = `<p style="color:#e53e3e;">通信エラー: ${err.message}</p>`;
+    } finally {
+      removeCursor();
+      btn.disabled = false;
+      btn.textContent = '分析・仮説を生成する';
+      setStatus('done');
+      actionBar.style.display = 'flex';
+    }
+  });
+
+  function copyToClipboard() {
+    navigator.clipboard.writeText(rawText).then(() => {
+      alert('テキストをコピーしました');
+    });
+  }
+
+  function resetForm() {
+    form.reset();
+    output.style.display = 'none';
+    output.innerHTML = '';
+    emptyState.style.display = 'block';
+    actionBar.style.display = 'none';
+    setStatus('idle');
+    rawText = '';
+  }
+</script>
+</body>
+</html>

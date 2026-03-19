@@ -1,0 +1,70 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <title>{{ row.company_name }} | 分析レポート</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: 'Hiragino Kaku Gothic ProN', 'Meiryo', sans-serif; background: #f0f4f8; color: #1a202c; }
+    header { background: #1a365d; color: white; padding: 20px 40px; display: flex; justify-content: space-between; align-items: center; }
+    header h1 { font-size: 18px; }
+    .nav { display: flex; gap: 12px; }
+    .nav a { color: white; text-decoration: none; font-size: 13px; padding: 6px 14px; border: 1px solid rgba(255,255,255,.4); border-radius: 6px; }
+    .nav a:hover { background: rgba(255,255,255,.1); }
+    .container { max-width: 900px; margin: 32px auto; padding: 0 24px 40px; }
+    .meta-card { background: white; border-radius: 12px; box-shadow: 0 1px 4px rgba(0,0,0,.08); padding: 20px 24px; margin-bottom: 20px; }
+    .meta-card h2 { font-size: 18px; font-weight: 700; margin-bottom: 12px; color: #1a365d; }
+    .meta-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }
+    .meta-item label { font-size: 11px; font-weight: 600; color: #718096; display: block; margin-bottom: 3px; }
+    .meta-item span { font-size: 13px; color: #2d3748; }
+    .result-card { background: white; border-radius: 12px; box-shadow: 0 1px 4px rgba(0,0,0,.08); padding: 28px; }
+    .result-card h2 { font-size: 16px; font-weight: 700; color: #2d3748; margin-bottom: 20px; padding-bottom: 12px; border-bottom: 1px solid #e2e8f0; }
+    #report h2 { font-size: 16px; font-weight: 700; color: #1a365d; margin: 24px 0 10px; padding-bottom: 6px; border-bottom: 2px solid #ebf4ff; }
+    #report h2:first-child { margin-top: 0; }
+    #report h3 { font-size: 14px; font-weight: 700; color: #2b6cb0; margin: 14px 0 6px; }
+    #report p { font-size: 14px; line-height: 1.75; margin-bottom: 10px; }
+    #report ul, #report ol { padding-left: 20px; margin-bottom: 12px; }
+    #report li { font-size: 14px; line-height: 1.75; margin-bottom: 4px; }
+    #report strong { font-weight: 700; }
+    #report table { width: 100%; border-collapse: collapse; margin: 12px 0; font-size: 13px; }
+    #report th { background: #f7fafc; padding: 8px 12px; text-align: left; border: 1px solid #e2e8f0; font-weight: 600; color: #4a5568; }
+    #report td { padding: 8px 12px; border: 1px solid #e2e8f0; }
+    #report hr { border: none; border-top: 1px solid #e2e8f0; margin: 20px 0; }
+    @media print { header, .nav { display: none; } .container { padding: 0; } }
+  </style>
+</head>
+<body>
+<header>
+  <h1>{{ row.company_name }} — 分析レポート</h1>
+  <div class="nav">
+    <a href="/history">← 一覧に戻る</a>
+    <a href="/" >新規分析</a>
+    <a href="javascript:window.print()">印刷・PDF</a>
+  </div>
+</header>
+
+<div class="container">
+  <div class="meta-card">
+    <h2>{{ row.company_name }}</h2>
+    <div class="meta-grid">
+      <div class="meta-item"><label>業種</label><span>{{ row.industry }}</span></div>
+      <div class="meta-item"><label>規模</label><span>{{ row.company_size or "―" }}</span></div>
+      <div class="meta-item"><label>分析日時</label><span>{{ row.created_at }}</span></div>
+      <div class="meta-item"><label>商談の目的</label><span>{{ row.meeting_purpose or "―" }}</span></div>
+      <div class="meta-item"><label>課題</label><span>{{ row.challenges }}</span></div>
+    </div>
+  </div>
+
+  <div class="result-card">
+    <h2>分析レポート</h2>
+    <div id="report"></div>
+  </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+<script>
+  const raw = {{ row.result | tojson }};
+  document.getElementById('report').innerHTML = marked.parse(raw, { breaks: true, gfm: true });
+</script>
+</body>
+</html>
