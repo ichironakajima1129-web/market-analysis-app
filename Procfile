@@ -1,1 +1,1 @@
-web: gunicorn app:app -k gevent --timeout 120 --worker-connections 50
+web: gunicorn app:app -k gthread --threads 4 --timeout 120
