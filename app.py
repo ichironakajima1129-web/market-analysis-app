@@ -1,50 +1,155 @@
 import os
 import json
-import csv
-import sqlite3
+import secrets
 from datetime import datetime
-from flask import Flask, render_template, request, stream_with_context, Response, g
+from functools import wraps
+from flask import (Flask, render_template, request, stream_with_context,
+                   Response, session, redirect, url_for)
 import anthropic
 from dotenv import load_dotenv
 
 load_dotenv(override=True)
 
 app = Flask(__name__)
+app.secret_key = os.environ.get("SECRET_KEY", secrets.token_hex(32))
+
 client = anthropic.Anthropic(api_key=os.environ.get("ANTHROPIC_API_KEY"))
-DB_PATH = os.path.join(os.path.dirname(__file__), "analyses.db")
+TEAM_PASSWORD = os.environ.get("TEAM_PASSWORD", "")
 
-# ---- DB ----
+# ---- Database ----
 
-def get_db():
-    if "db" not in g:
-        g.db = sqlite3.connect(DB_PATH)
-        g.db.row_factory = sqlite3.Row
-    return g.db
+DATABASE_URL = os.environ.get("DATABASE_URL")
 
-@app.teardown_appcontext
-def close_db(e=None):
-    db = g.pop("db", None)
-    if db:
-        db.close()
+if DATABASE_URL:
+    import psycopg2
+    import psycopg2.extras
 
-def init_db():
-    with sqlite3.connect(DB_PATH) as db:
-        db.execute("""
-            CREATE TABLE IF NOT EXISTS analyses (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                created_at TEXT,
-                company_name TEXT,
-                industry TEXT,
-                company_size TEXT,
-                business_description TEXT,
-                challenges TEXT,
-                meeting_purpose TEXT,
-                additional_info TEXT,
-                result TEXT
+    def _connect():
+        return psycopg2.connect(DATABASE_URL, cursor_factory=psycopg2.extras.RealDictCursor)
+
+    def init_db():
+        with _connect() as conn:
+            with conn.cursor() as cur:
+                cur.execute("""
+                    CREATE TABLE IF NOT EXISTS analyses (
+                        id SERIAL PRIMARY KEY,
+                        created_at TEXT, company_name TEXT, industry TEXT,
+                        company_size TEXT, business_description TEXT,
+                        challenges TEXT, meeting_purpose TEXT,
+                        additional_info TEXT, result TEXT
+                    )
+                """)
+
+    def insert_analysis(row):
+        with _connect() as conn:
+            with conn.cursor() as cur:
+                cur.execute(
+                    "INSERT INTO analyses (created_at,company_name,industry,company_size,"
+                    "business_description,challenges,meeting_purpose,additional_info,result)"
+                    " VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s)",
+                    row,
+                )
+
+    def fetch_list():
+        with _connect() as conn:
+            with conn.cursor() as cur:
+                cur.execute(
+                    "SELECT id,created_at,company_name,industry,company_size"
+                    " FROM analyses ORDER BY id DESC"
+                )
+                return cur.fetchall()
+
+    def fetch_one(aid):
+        with _connect() as conn:
+            with conn.cursor() as cur:
+                cur.execute("SELECT * FROM analyses WHERE id=%s", (aid,))
+                return cur.fetchone()
+
+    def fetch_all():
+        with _connect() as conn:
+            with conn.cursor() as cur:
+                cur.execute("SELECT * FROM analyses ORDER BY id DESC")
+                return cur.fetchall()
+
+else:
+    import sqlite3
+    DB_PATH = os.path.join(os.path.dirname(__file__), "analyses.db")
+
+    def _connect():
+        conn = sqlite3.connect(DB_PATH)
+        conn.row_factory = sqlite3.Row
+        return conn
+
+    def init_db():
+        with _connect() as conn:
+            conn.execute("""
+                CREATE TABLE IF NOT EXISTS analyses (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    created_at TEXT, company_name TEXT, industry TEXT,
+                    company_size TEXT, business_description TEXT,
+                    challenges TEXT, meeting_purpose TEXT,
+                    additional_info TEXT, result TEXT
+                )
+            """)
+
+    def insert_analysis(row):
+        with _connect() as conn:
+            conn.execute(
+                "INSERT INTO analyses (created_at,company_name,industry,company_size,"
+                "business_description,challenges,meeting_purpose,additional_info,result)"
+                " VALUES (?,?,?,?,?,?,?,?,?)",
+                row,
             )
-        """)
+
+    def fetch_list():
+        with _connect() as conn:
+            return conn.execute(
+                "SELECT id,created_at,company_name,industry,company_size"
+                " FROM analyses ORDER BY id DESC"
+            ).fetchall()
+
+    def fetch_one(aid):
+        with _connect() as conn:
+            return conn.execute(
+                "SELECT * FROM analyses WHERE id=?", (aid,)
+            ).fetchone()
+
+    def fetch_all():
+        with _connect() as conn:
+            return conn.execute(
+                "SELECT * FROM analyses ORDER BY id DESC"
+            ).fetchall()
+
 
 init_db()
+
+# ---- Auth ----
+
+def login_required(f):
+    @wraps(f)
+    def decorated(*args, **kwargs):
+        if TEAM_PASSWORD and not session.get("logged_in"):
+            return redirect(url_for("login"))
+        return f(*args, **kwargs)
+    return decorated
+
+
+@app.route("/login", methods=["GET", "POST"])
+def login():
+    error = None
+    if request.method == "POST":
+        if request.form.get("password") == TEAM_PASSWORD:
+            session["logged_in"] = True
+            return redirect(url_for("index"))
+        error = "パスワードが違います"
+    return render_template("login.html", error=error)
+
+
+@app.route("/logout")
+def logout():
+    session.clear()
+    return redirect(url_for("login"))
+
 
 # ---- Prompts ----
 
@@ -113,11 +218,13 @@ ANALYSIS_PROMPT = """以下の顧客情報を基に、商談準備レポート�
 # ---- Routes ----
 
 @app.route("/")
+@login_required
 def index():
     return render_template("index.html")
 
 
 @app.route("/analyze", methods=["POST"])
+@login_required
 def analyze():
     data = request.get_json()
 
@@ -135,7 +242,6 @@ def analyze():
 
     def generate():
         try:
-            # キープアライブ（接続維持）
             yield ": keepalive\n\n"
 
             with client.messages.stream(
@@ -148,26 +254,17 @@ def analyze():
                     full_result.append(text)
                     yield f"data: {json.dumps({'text': text}, ensure_ascii=False)}\n\n"
 
-            # 完了後にDBへ保存
-            with sqlite3.connect(DB_PATH) as db:
-                db.execute(
-                    """INSERT INTO analyses
-                       (created_at, company_name, industry, company_size,
-                        business_description, challenges, meeting_purpose,
-                        additional_info, result)
-                       VALUES (?,?,?,?,?,?,?,?,?)""",
-                    (
-                        datetime.now().strftime("%Y-%m-%d %H:%M"),
-                        data.get("company_name", ""),
-                        data.get("industry", ""),
-                        data.get("company_size", ""),
-                        data.get("business_description", ""),
-                        data.get("challenges", ""),
-                        data.get("meeting_purpose", ""),
-                        data.get("additional_info", ""),
-                        "".join(full_result),
-                    ),
-                )
+            insert_analysis((
+                datetime.now().strftime("%Y-%m-%d %H:%M"),
+                data.get("company_name", ""),
+                data.get("industry", ""),
+                data.get("company_size", ""),
+                data.get("business_description", ""),
+                data.get("challenges", ""),
+                data.get("meeting_purpose", ""),
+                data.get("additional_info", ""),
+                "".join(full_result),
+            ))
 
         except Exception as e:
             yield f"data: {json.dumps({'error': str(e)}, ensure_ascii=False)}\n\n"
@@ -182,37 +279,38 @@ def analyze():
 
 
 @app.route("/history")
+@login_required
 def history():
-    db = get_db()
-    rows = db.execute(
-        "SELECT id, created_at, company_name, industry, company_size FROM analyses ORDER BY id DESC"
-    ).fetchall()
+    rows = fetch_list()
     return render_template("history.html", rows=rows)
 
 
 @app.route("/history/<int:analysis_id>")
+@login_required
 def history_detail(analysis_id):
-    db = get_db()
-    row = db.execute("SELECT * FROM analyses WHERE id=?", (analysis_id,)).fetchone()
+    row = fetch_one(analysis_id)
     if not row:
         return "Not found", 404
     return render_template("detail.html", row=row)
 
 
 @app.route("/export")
+@login_required
 def export():
-    db = get_db()
-    rows = db.execute("SELECT * FROM analyses ORDER BY id DESC").fetchall()
+    rows = fetch_all()
 
     def generate_csv():
         headers = ["ID", "日時", "企業名", "業種", "企業規模", "事業内容", "課題", "商談目的", "補足", "分析結果"]
-        yield "\ufeff"  # BOM for Excel
+        yield "\ufeff"
         yield ",".join(headers) + "\n"
         for row in rows:
-            values = [str(row["id"]), row["created_at"], row["company_name"],
-                      row["industry"], row["company_size"], row["business_description"],
-                      row["challenges"], row["meeting_purpose"], row["additional_info"],
-                      row["result"]]
+            values = [
+                str(row["id"]), row["created_at"] or "", row["company_name"] or "",
+                row["industry"] or "", row["company_size"] or "",
+                row["business_description"] or "", row["challenges"] or "",
+                row["meeting_purpose"] or "", row["additional_info"] or "",
+                row["result"] or "",
+            ]
             yield ",".join(f'"{v.replace(chr(34), chr(34)*2)}"' for v in values) + "\n"
 
     return Response(

@@ -1,0 +1,106 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>ログイン — 市場・競合分析 AI</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: 'Hiragino Kaku Gothic ProN', 'Meiryo', sans-serif;
+      background: #f0f4f8;
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    .card {
+      background: white;
+      border-radius: 12px;
+      box-shadow: 0 2px 12px rgba(0,0,0,.1);
+      padding: 48px 40px;
+      width: 360px;
+    }
+    .logo {
+      text-align: center;
+      margin-bottom: 32px;
+    }
+    .logo h1 {
+      font-size: 18px;
+      font-weight: 700;
+      color: #1a365d;
+      margin-bottom: 6px;
+    }
+    .logo p {
+      font-size: 12px;
+      color: #a0aec0;
+    }
+    label {
+      display: block;
+      font-size: 12px;
+      font-weight: 600;
+      color: #4a5568;
+      margin-bottom: 6px;
+    }
+    input[type="password"] {
+      width: 100%;
+      border: 1px solid #e2e8f0;
+      border-radius: 7px;
+      padding: 10px 14px;
+      font-size: 14px;
+      font-family: inherit;
+      color: #2d3748;
+      background: #fafafa;
+      transition: border-color .2s;
+    }
+    input[type="password"]:focus {
+      outline: none;
+      border-color: #2b6cb0;
+      background: white;
+      box-shadow: 0 0 0 3px rgba(43,108,176,.1);
+    }
+    .error {
+      background: #fff5f5;
+      border: 1px solid #fed7d7;
+      color: #c53030;
+      border-radius: 6px;
+      padding: 10px 14px;
+      font-size: 13px;
+      margin-bottom: 16px;
+    }
+    button {
+      width: 100%;
+      background: #2b6cb0;
+      color: white;
+      border: none;
+      border-radius: 8px;
+      padding: 12px;
+      font-size: 15px;
+      font-weight: 700;
+      cursor: pointer;
+      margin-top: 20px;
+      font-family: inherit;
+      transition: background .2s;
+    }
+    button:hover { background: #2c5282; }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <div class="logo">
+      <h1>市場・競合分析 AI</h1>
+      <p>商談・提案準備のための仮説立案ツール</p>
+    </div>
+
+    {% if error %}
+    <div class="error">{{ error }}</div>
+    {% endif %}
+
+    <form method="POST">
+      <label for="password">チームパスワード</label>
+      <input type="password" id="password" name="password" placeholder="パスワードを入力" autofocus required>
+      <button type="submit">ログイン</button>
+    </form>
+  </div>
+</body>
+</html>

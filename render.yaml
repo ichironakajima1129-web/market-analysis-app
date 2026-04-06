@@ -1,0 +1,22 @@
+services:
+  - type: web
+    name: market-analysis-app
+    runtime: python
+    buildCommand: pip install -r requirements.txt
+    startCommand: gunicorn app:app -k gthread --threads 4 --timeout 120
+    envVars:
+      - key: ANTHROPIC_API_KEY
+        sync: false          # Renderダッシュボードで手動設定
+      - key: TEAM_PASSWORD
+        sync: false          # Renderダッシュボードで手動設定
+      - key: SECRET_KEY
+        generateValue: true  # Renderが自動生成
+      - key: DATABASE_URL
+        fromDatabase:
+          name: market-analysis-db
+          property: connectionString
+
+databases:
+  - name: market-analysis-db
+    databaseName: market_analysis
+    plan: free
