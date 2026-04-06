@@ -323,6 +323,27 @@ def history_detail(analysis_id):
     return render_template("detail.html", row=row)
 
 
+@app.route("/test-sheets")
+def test_sheets():
+    try:
+        import gspread
+        from google.oauth2.service_account import Credentials
+        creds_json = os.environ.get("GOOGLE_CREDENTIALS", "")
+        if not creds_json:
+            return "GOOGLE_CREDENTIALS が未設定", 500
+        creds = Credentials.from_service_account_info(
+            json.loads(creds_json),
+            scopes=["https://www.googleapis.com/auth/spreadsheets"],
+        )
+        gc = gspread.authorize(creds)
+        sh = gc.open_by_key(SPREADSHEET_ID)
+        ws = sh.sheet1
+        ws.append_row(["テスト", "接続確認", "", "", "", "", "", "", "OK"])
+        return "成功：スプレッドシートに書き込みました", 200
+    except Exception as e:
+        return f"エラー: {e}", 500
+
+
 @app.route("/export")
 @login_required
 def export():
