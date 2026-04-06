@@ -35,10 +35,6 @@ def append_to_sheet(row_data):
         gc = gspread.authorize(creds)
         sh = gc.open_by_key(SPREADSHEET_ID)
         ws = sh.sheet1
-        # ヘッダーがなければ追加
-        existing = ws.get_all_values()
-        if not existing or existing[0][0] != "日時":
-            ws.append_row(["日時", "企業名", "業種", "企業規模", "事業内容", "課題", "商談目的", "補足", "分析結果"])
         ws.append_row(row_data)
     except Exception as e:
         print(f"Sheets書き込みエラー: {e}")
