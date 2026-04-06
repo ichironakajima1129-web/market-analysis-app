@@ -3,3 +3,5 @@ anthropic==0.40.0
 python-dotenv==1.0.1
 gunicorn==21.2.0
 psycopg2-binary==2.9.9
+gspread==6.1.2
+google-auth==2.29.0

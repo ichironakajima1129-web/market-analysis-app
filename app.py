@@ -16,6 +16,32 @@ app.secret_key = os.environ.get("SECRET_KEY", secrets.token_hex(32))
 client = anthropic.Anthropic(api_key=os.environ.get("ANTHROPIC_API_KEY"))
 TEAM_PASSWORD = os.environ.get("TEAM_PASSWORD", "")
 
+# ---- Google Sheets ----
+
+SPREADSHEET_ID = os.environ.get("SPREADSHEET_ID", "")
+
+def append_to_sheet(row_data):
+    """分析結果をGoogle Sheetsに追記する"""
+    creds_json = os.environ.get("GOOGLE_CREDENTIALS", "")
+    if not creds_json or not SPREADSHEET_ID:
+        return
+    try:
+        import gspread
+        from google.oauth2.service_account import Credentials
+        creds = Credentials.from_service_account_info(
+            json.loads(creds_json),
+            scopes=["https://www.googleapis.com/auth/spreadsheets"],
+        )
+        gc = gspread.authorize(creds)
+        sh = gc.open_by_key(SPREADSHEET_ID)
+        ws = sh.sheet1
+        # ヘッダーがなければ追加
+        if ws.row_count == 0 or ws.cell(1, 1).value != "日時":
+            ws.append_row(["日時", "企業名", "業種", "企業規模", "事業内容", "課題", "商談目的", "補足", "分析結果"])
+        ws.append_row(row_data)
+    except Exception as e:
+        print(f"Sheets書き込みエラー: {e}")
+
 # ---- Database ----
 
 DATABASE_URL = os.environ.get("DATABASE_URL")
@@ -254,7 +280,7 @@ def analyze():
                     full_result.append(text)
                     yield f"data: {json.dumps({'text': text}, ensure_ascii=False)}\n\n"
 
-            insert_analysis((
+            row = (
                 datetime.now().strftime("%Y-%m-%d %H:%M"),
                 data.get("company_name", ""),
                 data.get("industry", ""),
@@ -264,7 +290,9 @@ def analyze():
                 data.get("meeting_purpose", ""),
                 data.get("additional_info", ""),
                 "".join(full_result),
-            ))
+            )
+            insert_analysis(row)
+            append_to_sheet(list(row))
 
         except Exception as e:
             yield f"data: {json.dumps({'error': str(e)}, ensure_ascii=False)}\n\n"
